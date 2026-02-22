@@ -1,0 +1,110 @@
+from __future__ import annotations
+
+from typing import Optional, List, Dict, Any
+from datetime import datetime, timezone
+
+from psycopg.types.json import Jsonb
+
+from common.db import get_conn
+
+
+def claim_job(*, job_types: List[str], claimed_by: str) -> Optional[Dict[str, Any]]:
+    if not job_types:
+        return None
+
+    now = datetime.now(timezone.utc).isoformat()
+
+    try:
+        with get_conn() as conn, conn.cursor() as cur:
+            cur.execute(
+                """
+                WITH candidate AS (
+                    SELECT dispatch_id
+                    FROM job_dispatch
+                    WHERE status = 'queued'
+                      AND allowed = true
+                      AND job_type = ANY(%s::text[])
+                    ORDER BY ts ASC
+                    LIMIT 1
+                    FOR UPDATE SKIP LOCKED
+                )
+                UPDATE job_dispatch
+                SET
+                    status = 'running',
+                    payload = COALESCE(payload,'{}'::jsonb)
+                              || %s::jsonb
+                WHERE dispatch_id IN (SELECT dispatch_id FROM candidate)
+                RETURNING
+                    dispatch_id,
+                    job_type,
+                    run_id,
+                    payload
+                """,
+                (
+                    job_types,
+                    Jsonb({"claimed_at": now, "claimed_by": claimed_by}),
+                ),
+            )
+            row = cur.fetchone()
+            if not row:
+                return None
+
+            dispatch_id, job_type, run_id, payload = row
+            return {
+                "dispatch_id": str(dispatch_id),
+                "job_type": str(job_type),
+                "run_id": str(run_id) if run_id else None,
+                "payload": payload or {},
+            }
+
+    except Exception as e:
+        print(f"[JOB_CLAIM] claim failed err={e}", flush=True)
+        return None
+
+
+def mark_done(dispatch_id: str, *, extra: Optional[dict] = None) -> None:
+    try:
+        with get_conn() as conn, conn.cursor() as cur:
+            cur.execute(
+                """
+                UPDATE job_dispatch
+                SET
+                    status = 'done',
+                    payload = COALESCE(payload,'{}'::jsonb)
+                              || %s::jsonb
+                WHERE dispatch_id = %s
+                """,
+                (
+                    Jsonb({"done_at": datetime.now(timezone.utc).isoformat(), **(extra or {})}),
+                    dispatch_id,
+                ),
+            )
+    except Exception as e:
+        print(f"[JOB_CLAIM] mark_done failed dispatch_id={dispatch_id} err={e}", flush=True)
+
+
+def mark_error(dispatch_id: str, error: str, *, extra: Optional[dict] = None) -> None:
+    try:
+        with get_conn() as conn, conn.cursor() as cur:
+            cur.execute(
+                """
+                UPDATE job_dispatch
+                SET
+                    status = 'error',
+                    payload = COALESCE(payload,'{}'::jsonb)
+                              || %s::jsonb
+                WHERE dispatch_id = %s
+                """,
+                (
+                    Jsonb(
+                        {
+                            "error_at": datetime.now(timezone.utc).isoformat(),
+                            "error": str(error)[:500],
+                            **(extra or {}),
+                        }
+                    ),
+                    dispatch_id,
+                ),
+            )
+    except Exception as e:
+        print(f"[JOB_CLAIM] mark_error failed dispatch_id={dispatch_id} err={e}", flush=True)
