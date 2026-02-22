@@ -3,7 +3,7 @@ from __future__ import annotations
 import os
 
 # =========================================================
-# ALPACA CREDENTIALS (YOUR STYLE)
+# 🔴 LIVE-ONLY ALPACA CONFIG
 # =========================================================
 
 ALPACA_KEY_ID = (
@@ -19,22 +19,12 @@ ALPACA_SECRET_KEY = (
 if not ALPACA_KEY_ID or not ALPACA_SECRET_KEY:
     raise RuntimeError("❌ Alpaca credentials missing")
 
-# ---------------------------------------------------------
-# PAPER / LIVE MODE (LIVE DEFAULT)
-# ---------------------------------------------------------
-
-ALPACA_PAPER = os.getenv("ALPACA_PAPER", "false").strip().lower() in (
-    "1", "true", "yes", "y"
-)
-
-# 🔴 Explicit base URL (live default)
-ALPACA_BASE_URL = os.getenv(
-    "ALPACA_BASE_URL",
-    "https://paper-api.alpaca.markets" if ALPACA_PAPER else "https://api.alpaca.markets",
-).rstrip("/")
+# 🔴 HARD LOCK TO LIVE
+ALPACA_PAPER = False
+ALPACA_BASE_URL = "https://api.alpaca.markets"
 
 # ---------------------------------------------------------
-# DATA / STREAM
+# DATA / STREAM (kept for compatibility)
 # ---------------------------------------------------------
 
 ALPACA_DATA_URL = os.getenv(
@@ -60,13 +50,9 @@ ALPACA_STREAM_URL = os.getenv(
 ALPACA_API_KEY = ALPACA_KEY_ID
 ALPACA_API_SECRET = ALPACA_SECRET_KEY
 
-
 # =========================================================
 # EXECUTOR GUARDS
 # =========================================================
-
-MAX_PENNY_POSITIONS = int(os.getenv("MAX_PENNY_POSITIONS", "1"))
-MAX_PENNY_TRADES_PER_DAY = int(os.getenv("MAX_PENNY_TRADES_PER_DAY", "1"))
 
 MAX_STOCKS_POSITIONS = int(os.getenv("MAX_STOCKS_POSITIONS", "5"))
 MAX_STOCKS_TRADES_PER_DAY = int(os.getenv("MAX_STOCKS_TRADES_PER_DAY", "10"))
@@ -77,3 +63,5 @@ ALLOW_MARKET_BRACKET = os.getenv("ALLOW_MARKET_BRACKET", "0").strip().lower() in
 
 POLL_SEC = int(os.getenv("EXECUTOR_POLL_SEC", "5"))
 IDLE_HEARTBEAT_SEC = int(os.getenv("EXECUTOR_IDLE_HEARTBEAT_SEC", "30"))
+
+print(f"[CONFIG] 🔴 LIVE MODE LOCKED → {ALPACA_BASE_URL}", flush=True)
