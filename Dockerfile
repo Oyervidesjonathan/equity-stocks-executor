@@ -10,5 +10,4 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-# Choose runner with EXECUTOR_MODE=penny|stocks
-CMD ["python", "-m", "executor.runners.penny_runner"]
+CMD ["python", "-m", "executor.runners.stocks_runner"]
