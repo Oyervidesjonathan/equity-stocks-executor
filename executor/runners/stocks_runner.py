@@ -16,6 +16,9 @@ JOB_TYPES = ["stocks"]
 def main():
     print("🚀 equity-executor (stocks) started", flush=True)
     last_idle = 0.0
+    client = get_trading_client()
+    acct = client.get_account()
+    print(f"[EXECUTOR] LIVE ACCOUNT STATUS={acct.status} buying_power={acct.buying_power}", flush=True)
 
     while True:
         job = claim_job(job_types=JOB_TYPES, claimed_by=WORKER)
