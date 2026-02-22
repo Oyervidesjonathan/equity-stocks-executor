@@ -20,7 +20,7 @@ def get_trading_client() -> TradingClient:
     _client = TradingClient(
         api_key=ALPACA_KEY_ID,
         secret_key=ALPACA_SECRET_KEY,
-        paper=False,  # 🔴 we control environment via base_url instead
+        paper=False,  # 🔴 ignored, we use url_override
         url_override=ALPACA_BASE_URL,
     )
 
