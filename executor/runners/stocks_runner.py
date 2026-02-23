@@ -110,7 +110,9 @@ def main():
                         failed += 1
                         print(
                             f"[EXECUTOR-STOCKS] FAIL "
-                            f"symbol={symbol} reason={res.get('reason')}",
+                            f"symbol={symbol} "
+                            f"reason={res.get('reason')} "
+                            f"error={res.get('error')}",
                             flush=True,
                         )
 
