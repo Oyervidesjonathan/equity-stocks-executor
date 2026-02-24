@@ -16,7 +16,7 @@ from executor.guards import (
 from executor.orders import build_order_from_planning_context
 from executor.config import MAX_STOCKS_POSITIONS, MAX_STOCKS_TRADES_PER_DAY
 from common.logging import log_trade_event
-from executor.db import get_conn
+from common.db import get_conn
 
 
 def _to_float(x, default=None):
