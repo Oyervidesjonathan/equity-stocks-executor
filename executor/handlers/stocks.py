@@ -16,7 +16,7 @@ from executor.guards import (
 from executor.orders import build_order_from_planning_context
 from executor.config import MAX_STOCKS_POSITIONS, MAX_STOCKS_TRADES_PER_DAY
 from common.logging import log_trade_event
-from common.db import get_shared_conn
+from executor.db import get_conn
 
 
 def _to_float(x, default=None):
@@ -49,7 +49,7 @@ def _insert_trade_open(
       - If an OPEN trade already exists for this alpaca_order_id, do nothing.
     """
     try:
-        with get_shared_conn() as conn, conn.cursor() as cur:
+        with get_conn() as conn, conn.cursor() as cur:
             # If we already have an OPEN trade for this symbol, don't insert another
             cur.execute(
                 """
