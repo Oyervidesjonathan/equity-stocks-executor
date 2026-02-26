@@ -50,22 +50,21 @@ def main():
             continue
 
         dispatch_id = job["dispatch_id"]
-        payload = job.get("payload") or {}
 
         # ---------------------------------------------------------
         # RUN_ID (MANAGER-OWNED, REQUIRED)
-        # - Trust payload.run_id only (no fallbacks)
-        # - Fail loud if missing to prevent "run_id" literal bugs
+        # - Trust job_dispatch.run_id (top-level) — NOT payload
+        # - Avoid JSON decoding / payload-as-string issues
         # ---------------------------------------------------------
-        run_id = payload.get("run_id")
+        run_id = job.get("run_id")
 
         if not run_id:
             print(
-                f"[EXECUTOR-STOCKS] ❌ missing run_id in payload "
-                f"dispatch_id={dispatch_id} payload_keys={list(payload.keys())}",
+                f"[EXECUTOR-STOCKS] ❌ missing run_id on job row "
+                f"dispatch_id={dispatch_id}",
                 flush=True,
             )
-            mark_error(dispatch_id, "missing_run_id_in_payload")
+            mark_error(dispatch_id, "missing_run_id_on_job")
             time.sleep(1)
             continue
 
@@ -89,7 +88,7 @@ def main():
             # ---------------------------------------------------------
             while True:
                 intent = claim_next_intent(
-                    run_id=run_id,
+                    run_id=str(run_id),
                     executor="stocks",
                 )
 
@@ -107,7 +106,7 @@ def main():
 
                 try:
                     res = execute_stocks_intent(
-                        run_id=run_id,
+                        run_id=str(run_id),
                         intent=intent,
                     )
 
