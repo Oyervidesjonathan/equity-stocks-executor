@@ -51,10 +51,28 @@ def main():
 
         dispatch_id = job["dispatch_id"]
         payload = job.get("payload") or {}
-        run_id = job.get("run_id") or payload.get("run_id")
+
+        # ---------------------------------------------------------
+        # RUN_ID (MANAGER-OWNED, REQUIRED)
+        # - Trust payload.run_id only (no fallbacks)
+        # - Fail loud if missing to prevent "run_id" literal bugs
+        # ---------------------------------------------------------
+        run_id = payload.get("run_id")
 
         if not run_id:
-            mark_done(dispatch_id, extra={"skipped": "missing_run_id"})
+            print(
+                f"[EXECUTOR-STOCKS] ❌ missing run_id in payload "
+                f"dispatch_id={dispatch_id} payload_keys={list(payload.keys())}",
+                flush=True,
+            )
+            mark_error(dispatch_id, "missing_run_id_in_payload")
+            time.sleep(1)
+            continue
+
+        # extra guard: prevent accidental literal placeholders ever hitting DB
+        if run_id in ("run_id", "dispatch_id"):
+            mark_error(dispatch_id, f"invalid_literal_run_id value={run_id}")
+            time.sleep(1)
             continue
 
         executed = 0
@@ -71,7 +89,7 @@ def main():
             # ---------------------------------------------------------
             while True:
                 intent = claim_next_intent(
-                    run_id=str(run_id),
+                    run_id=run_id,
                     executor="stocks",
                 )
 
@@ -89,7 +107,7 @@ def main():
 
                 try:
                     res = execute_stocks_intent(
-                        run_id=str(run_id),
+                        run_id=run_id,
                         intent=intent,
                     )
 
