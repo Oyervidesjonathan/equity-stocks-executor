@@ -8,6 +8,18 @@ from psycopg.types.json import Jsonb
 from common.db import get_conn
 
 
+def _row_get(row: Any, key: str, idx: int):
+    # psycopg dict_row returns a dict-like; normal cursor returns tuple
+    if row is None:
+        return None
+    if isinstance(row, dict):
+        return row.get(key)
+    try:
+        return row[idx]
+    except Exception:
+        return None
+
+
 def claim_job(*, job_types: List[str], claimed_by: str) -> Optional[Dict[str, Any]]:
     if not job_types:
         return None
@@ -49,11 +61,14 @@ def claim_job(*, job_types: List[str], claimed_by: str) -> Optional[Dict[str, An
             if not row:
                 return None
 
-            dispatch_id, job_type, run_id, payload = row
+            dispatch_id = _row_get(row, "dispatch_id", 0)
+            job_type = _row_get(row, "job_type", 1)
+            run_id = _row_get(row, "run_id", 2)
+            payload = _row_get(row, "payload", 3)
 
             return {
-                "dispatch_id": str(dispatch_id),
-                "job_type": str(job_type),
+                "dispatch_id": str(dispatch_id) if dispatch_id else None,
+                "job_type": str(job_type) if job_type else None,
                 "run_id": str(run_id) if run_id else None,
                 "payload": payload or {},
             }
