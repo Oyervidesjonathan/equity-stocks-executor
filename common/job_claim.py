@@ -50,6 +50,7 @@ def claim_job(*, job_types: List[str], claimed_by: str) -> Optional[Dict[str, An
                 return None
 
             dispatch_id, job_type, run_id, payload = row
+
             return {
                 "dispatch_id": str(dispatch_id),
                 "job_type": str(job_type),
@@ -63,6 +64,10 @@ def claim_job(*, job_types: List[str], claimed_by: str) -> Optional[Dict[str, An
 
 
 def mark_done(dispatch_id: str, *, extra: Optional[dict] = None) -> None:
+    if not dispatch_id or dispatch_id in ("dispatch_id",):
+        print(f"[JOB_CLAIM] mark_done invalid dispatch_id={dispatch_id}", flush=True)
+        return
+
     try:
         with get_conn() as conn, conn.cursor() as cur:
             cur.execute(
@@ -72,10 +77,15 @@ def mark_done(dispatch_id: str, *, extra: Optional[dict] = None) -> None:
                     status = 'done',
                     payload = COALESCE(payload,'{}'::jsonb)
                               || %s::jsonb
-                WHERE dispatch_id = %s
+                WHERE dispatch_id = %s::uuid
                 """,
                 (
-                    Jsonb({"done_at": datetime.now(timezone.utc).isoformat(), **(extra or {})}),
+                    Jsonb(
+                        {
+                            "done_at": datetime.now(timezone.utc).isoformat(),
+                            **(extra or {}),
+                        }
+                    ),
                     dispatch_id,
                 ),
             )
@@ -84,6 +94,10 @@ def mark_done(dispatch_id: str, *, extra: Optional[dict] = None) -> None:
 
 
 def mark_error(dispatch_id: str, error: str, *, extra: Optional[dict] = None) -> None:
+    if not dispatch_id or dispatch_id in ("dispatch_id",):
+        print(f"[JOB_CLAIM] mark_error invalid dispatch_id={dispatch_id}", flush=True)
+        return
+
     try:
         with get_conn() as conn, conn.cursor() as cur:
             cur.execute(
@@ -93,7 +107,7 @@ def mark_error(dispatch_id: str, error: str, *, extra: Optional[dict] = None) ->
                     status = 'error',
                     payload = COALESCE(payload,'{}'::jsonb)
                               || %s::jsonb
-                WHERE dispatch_id = %s
+                WHERE dispatch_id = %s::uuid
                 """,
                 (
                     Jsonb(
