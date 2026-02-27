@@ -72,25 +72,40 @@ def execute_penny_intent(*, run_id: str, intent: dict) -> Dict[str, Any]:
         return {"ok": False, "reason": "skip_open_buy_order"}
 
     # ------------------------------------------------------
-    # POSITION SIZING (CONVICTION-AWARE)
+    # POSITION SIZING (RISK-DISTANCE AWARE)
     # ------------------------------------------------------
 
     qty = pc.get("qty")
 
     if qty is None:
-        # Auto-size using max_notional_usd and entry_price_hint
-        max_notional = pc.get("max_notional_usd")
         entry_hint = (pc.get("meta") or {}).get("entry_price_hint")
+        stop_loss = pc.get("stop_loss")
+        max_risk = pc.get("max_risk_usd")
+        max_notional = pc.get("max_notional_usd")
 
-        if not max_notional or not entry_hint:
-            return {"ok": False, "reason": "missing_qty_and_sizing_inputs"}
+        # 1) Preferred: risk-distance sizing
+        if entry_hint is not None and stop_loss is not None and max_risk is not None:
+            try:
+                entry_price = float(entry_hint)
+                stop_price = float(stop_loss)
+                risk_per_share = abs(entry_price - stop_price)
 
-        try:
-            qty = math.floor(float(max_notional) / float(entry_hint))
-        except Exception:
-            return {"ok": False, "reason": "sizing_error"}
+                if risk_per_share > 0:
+                    qty = math.floor(float(max_risk) / risk_per_share)
+            except Exception:
+                qty = None
 
-        if qty <= 0:
+        # 2) Fallback: notional sizing
+        if qty is None:
+            if not max_notional or not entry_hint:
+                return {"ok": False, "reason": "missing_qty_and_sizing_inputs"}
+
+            try:
+                qty = math.floor(float(max_notional) / float(entry_hint))
+            except Exception:
+                return {"ok": False, "reason": "sizing_error"}
+
+        if not qty or qty <= 0:
             return {"ok": False, "reason": "qty_zero_after_sizing"}
 
     try:
