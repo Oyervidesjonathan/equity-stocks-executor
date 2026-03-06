@@ -48,28 +48,35 @@ def execute_penny_intent(*, run_id: str, intent: dict) -> Dict[str, Any]:
             }
 
     # ------------------------------------------------------
-    # POSITION CAP (PLANNER-AWARE)
+    # POSITION GUARD (STRICT SINGLE POSITION)
     # ------------------------------------------------------
 
     open_pos = count_open_positions(client)
 
-    effective_cap = MAX_PENNY_POSITIONS
+    # Prevent multiple buys during race conditions
+    pending_buy = has_open_buy_order(client, symbol)
+
+    effective_cap = 1  # hard cap for penny trades
+
     if isinstance(run_position_cap, int) and run_position_cap > 0:
         effective_cap = min(effective_cap, run_position_cap)
 
     if open_pos >= effective_cap:
         return {
             "ok": False,
-            "reason": "max_positions_reached",
+            "reason": "position_already_open",
             "open_positions": open_pos,
             "cap": effective_cap,
         }
 
+    if pending_buy:
+        return {
+            "ok": False,
+            "reason": "pending_buy_order_exists",
+        }
+
     if has_open_position(client, symbol):
         return {"ok": False, "reason": "skip_already_in_position"}
-
-    if has_open_buy_order(client, symbol):
-        return {"ok": False, "reason": "skip_open_buy_order"}
 
     # ------------------------------------------------------
     # POSITION SIZING (RISK-DISTANCE AWARE)
@@ -83,7 +90,7 @@ def execute_penny_intent(*, run_id: str, intent: dict) -> Dict[str, Any]:
         max_risk = pc.get("max_risk_usd")
         max_notional = pc.get("max_notional_usd")
 
-        # 1) Preferred: risk-distance sizing
+        # Preferred: risk-distance sizing
         if entry_hint is not None and stop_loss is not None and max_risk is not None:
             try:
                 entry_price = float(entry_hint)
@@ -95,7 +102,7 @@ def execute_penny_intent(*, run_id: str, intent: dict) -> Dict[str, Any]:
             except Exception:
                 qty = None
 
-        # 2) Fallback: notional sizing
+        # Fallback: notional sizing
         if qty is None:
             if not max_notional or not entry_hint:
                 return {"ok": False, "reason": "missing_qty_and_sizing_inputs"}
