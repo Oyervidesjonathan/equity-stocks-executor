@@ -7,6 +7,7 @@ from executor.alpaca_client import get_trading_client
 from executor.validate import validate_planning_context
 from executor.guards import (
     count_open_positions,
+    count_open_buy_orders,   # NEW
     has_open_position,
     has_open_buy_order,
     count_filled_buys_today_utc,
@@ -48,35 +49,39 @@ def execute_penny_intent(*, run_id: str, intent: dict) -> Dict[str, Any]:
             }
 
     # ------------------------------------------------------
-    # POSITION GUARD (STRICT SINGLE POSITION)
+    # GLOBAL POSITION GUARD
+    # open positions + open buy orders
     # ------------------------------------------------------
 
     open_pos = count_open_positions(client)
+    pending_buys = count_open_buy_orders(client)
 
-    # Prevent multiple buys during race conditions
-    pending_buy = has_open_buy_order(client, symbol)
+    active_positions = open_pos + pending_buys
 
-    effective_cap = 1  # hard cap for penny trades
+    effective_cap = MAX_PENNY_POSITIONS
 
     if isinstance(run_position_cap, int) and run_position_cap > 0:
         effective_cap = min(effective_cap, run_position_cap)
 
-    if open_pos >= effective_cap:
+    if active_positions >= effective_cap:
         return {
             "ok": False,
-            "reason": "position_already_open",
+            "reason": "max_positions_reached",
             "open_positions": open_pos,
+            "pending_buys": pending_buys,
+            "active_positions": active_positions,
             "cap": effective_cap,
         }
 
-    if pending_buy:
-        return {
-            "ok": False,
-            "reason": "pending_buy_order_exists",
-        }
+    # ------------------------------------------------------
+    # SYMBOL GUARDS
+    # ------------------------------------------------------
 
     if has_open_position(client, symbol):
         return {"ok": False, "reason": "skip_already_in_position"}
+
+    if has_open_buy_order(client, symbol):
+        return {"ok": False, "reason": "skip_open_buy_order"}
 
     # ------------------------------------------------------
     # POSITION SIZING (RISK-DISTANCE AWARE)
