@@ -39,6 +39,32 @@ def has_open_buy_order(client: TradingClient, symbol: str) -> bool:
     except Exception:
         return False
 
+def count_open_buy_orders(client: TradingClient) -> int:
+    """
+    Counts ALL open BUY orders across the account.
+    These act like pending positions and prevent
+    multiple trades being opened simultaneously.
+    """
+    try:
+        req = GetOrdersRequest(
+            status=QueryOrderStatus.OPEN,
+            limit=500,
+            nested=True,
+        )
+
+        orders = client.get_orders(req) or []
+
+        count = 0
+
+        for o in orders:
+            side = str(getattr(o, "side", "")).lower()
+            if side == "buy":
+                count += 1
+
+        return count
+
+    except Exception:
+        return 0
 
 def count_filled_buys_today_utc(client: TradingClient) -> int:
     """
