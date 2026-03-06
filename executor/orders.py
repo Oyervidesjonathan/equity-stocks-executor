@@ -6,6 +6,7 @@ from alpaca.trading.enums import OrderSide, TimeInForce
 from alpaca.trading.requests import (
     MarketOrderRequest,
     LimitOrderRequest,
+    StopLimitOrderRequest,
 )
 
 
@@ -20,16 +21,12 @@ def build_order_from_planning_context(
     qty: int,
     planning_context: Dict[str, Any],
 ) -> Tuple[Optional[object], str]:
-    """
-    ENTRY-ONLY BUILDER.
-    Watcher attaches exits.
-    Executor NEVER sends bracket/oco orders.
-    """
 
     pc = planning_context
+
     side = (pc.get("side") or "").lower()
-    entry_type = (pc.get("entry_type") or "").lower()
-    tif = (pc.get("time_in_force") or "").lower()
+    entry_type = (pc.get("entry_type") or pc.get("entry") or "").lower()
+    tif = (pc.get("time_in_force") or "day").lower()
 
     if side not in ("buy", "sell"):
         return None, "invalid_side"
@@ -38,8 +35,9 @@ def build_order_from_planning_context(
     alpaca_tif = TimeInForce.DAY if tif == "day" else TimeInForce.GTC
 
     # --------------------------------------------------
-    # ENTRY: MARKET (NO BRACKET ALLOWED)
+    # MARKET ENTRY
     # --------------------------------------------------
+
     if entry_type == "market":
         return (
             MarketOrderRequest(
@@ -52,9 +50,11 @@ def build_order_from_planning_context(
         )
 
     # --------------------------------------------------
-    # ENTRY: LIMIT (NO BRACKET ALLOWED)
+    # LIMIT ENTRY
     # --------------------------------------------------
+
     if entry_type == "limit":
+
         limit_price = pc.get("limit_price")
         if limit_price is None:
             return None, "missing_limit_price"
@@ -67,6 +67,33 @@ def build_order_from_planning_context(
                 qty=qty,
                 side=alpaca_side,
                 time_in_force=alpaca_tif,
+                limit_price=lp,
+            ),
+            "ok",
+        )
+
+    # --------------------------------------------------
+    # STOP-LIMIT BREAKOUT ENTRY
+    # --------------------------------------------------
+
+    if entry_type == "stop_limit":
+
+        stop_price = pc.get("stop_price")
+        limit_price = pc.get("limit_price")
+
+        if stop_price is None or limit_price is None:
+            return None, "missing_stop_limit_price"
+
+        sp = round_price(stop_price)
+        lp = round_price(limit_price)
+
+        return (
+            StopLimitOrderRequest(
+                symbol=symbol,
+                qty=qty,
+                side=alpaca_side,
+                time_in_force=alpaca_tif,
+                stop_price=sp,
                 limit_price=lp,
             ),
             "ok",
